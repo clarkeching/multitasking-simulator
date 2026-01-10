@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multitasking Simulator</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: monospace;
+            background: #f0f0f0;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 { margin: 0 0 5px 0; font-size: 28px; }
+        .subtitle { color: #666; margin-bottom: 20px; font-size: 14px; }
+
+        /* Onboarding Modal */
+        .onboarding-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .onboarding-overlay.hidden { display: none; }
+        .onboarding-modal {
+            background: #fff;
+            border: 4px solid #000;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 30px;
+        }
+        .onboarding-title { font-size: 24px; font-weight: bold; margin-bottom: 20px; }
+        .onboarding-section { margin-bottom: 20px; }
+        .onboarding-section h3 { margin: 0 0 10px 0; font-size: 16px; }
+        .onboarding-section p { margin: 0 0 10px 0; font-size: 14px; line-height: 1.5; }
+        .onboarding-section ul { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6; }
+        .scenario-box {
+            border: 2px solid #ccc;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+        }
+        .scenario-box.ideal { border-color: #9c27b0; }
+        .scenario-box.singletask { border-color: #4caf50; }
+        .scenario-box.multitask { border-color: #f44336; }
+        .scenario-box strong { display: block; margin-bottom: 5px; }
+        .onboarding-start {
+            font-size: 20px;
+            padding: 15px 40px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: 2px solid #000;
+            font-family: monospace;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .onboarding-start:hover { background: #45a049; }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .mode-selector {
+            display: flex;
+            border: 2px solid #000;
+            background: #fff;
+        }
+        .mode-btn {
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            background: #fff;
+            font-family: monospace;
+            border-right: 2px solid #000;
+        }
+        .mode-btn:last-child { border-right: none; }
+        .mode-btn.active { background: #333; color: #fff; }
+        .mode-btn:hover:not(.active) { background: #eee; }
+
+        .control-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        #startBtn {
+            font-size: 18px;
+            padding: 10px 25px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: 2px solid #000;
+            font-family: monospace;
+        }
+        #startBtn:hover { background: #45a049; }
+        #startBtn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .step-controls {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .step-btn {
+            font-size: 16px;
+            padding: 8px 12px;
+            cursor: pointer;
+            background: #fff;
+            border: 2px solid #000;
+            font-family: monospace;
+        }
+        .step-btn:hover { background: #eee; }
+        .step-btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        .speed-control select {
+            padding: 5px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .mute-btn {
+            font-size: 20px;
+            padding: 5px 10px;
+            cursor: pointer;
+            border: 2px solid #ccc;
+            background: #fff;
+            border-radius: 5px;
+        }
+        .mute-btn:hover { border-color: #666; }
+        .mute-btn.muted { background: #ffeeee; border-color: #ff6666; }
+
+        .toggle-btn {
+            font-size: 12px;
+            padding: 5px 10px;
+            cursor: pointer;
+            border: 2px solid #ccc;
+            background: #fff;
+            font-family: monospace;
+        }
+        .toggle-btn:hover { border-color: #666; }
+        .toggle-btn.active { background: #e8f5e9; border-color: #4caf50; }
+
+        .mode-explanation {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .mode-explanation strong { color: #333; }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .stat {
+            background: #fff;
+            padding: 12px 18px;
+            border: 2px solid #000;
+        }
+        .stat-label { font-size: 11px; color: #666; }
+        .stat-value { font-size: 22px; font-weight: bold; }
+        .stat-value.money { color: #2e7d32; }
+        .stat.earning {
+            animation: money-pulse 0.3s ease-out;
+        }
+        @keyframes money-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); background: #e8f5e9; }
+            100% { transform: scale(1); }
+        }
+
+        .timelines-container {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .timelines-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .project-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .project-row:last-child { margin-bottom: 0; }
+        .project-row.just-completed {
+            animation: project-complete 1s ease-out;
+        }
+        @keyframes project-complete {
+            0%, 100% { background: transparent; }
+            25%, 75% { background: #fff9c4; }
+        }
+
+        .project-label {
+            width: 120px;
+            flex-shrink: 0;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .project-label .value { color: #666; font-weight: normal; font-size: 12px; }
+        .project-label .status {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-top: 3px;
+            display: inline-block;
+        }
+        .project-label .status.waiting { background: #eee; color: #666; }
+        .project-label .status.in-progress { background: #fff3cd; color: #856404; }
+        .project-label .status.complete { background: #d4edda; color: #155724; }
+
+        .timeline {
+            flex: 1;
+            height: 40px;
+            background: #f5f5f5;
+            border: 1px solid #ccc;
+            position: relative;
+            overflow: hidden;
+        }
+        .timeline-grid {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+        }
+        .grid-line {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 1px;
+            background: rgba(0,0,0,0.15);
+        }
+        .grid-line.major { background: rgba(0,0,0,0.35); }
+
+        .task-block {
+            position: absolute;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: #fff;
+            border-right: 1px solid rgba(0,0,0,0.2);
+            transition: opacity 0.3s;
+        }
+        .task-block.blue { background: #3498db; }
+        .task-block.yellow { background: #f1c40f; color: #333; }
+        .task-block.green { background: #27ae60; }
+        .task-block.pending { opacity: 0; }
+        .task-block.active {
+            opacity: 1;
+            animation: pulse 0.5s infinite alternate;
+        }
+        .task-block.complete { opacity: 1; }
+
+        @keyframes pulse {
+            from { filter: brightness(1); }
+            to { filter: brightness(1.2); }
+        }
+
+        .week-markers {
+            display: flex;
+            margin-left: 120px;
+            margin-top: 5px;
+            font-size: 10px;
+            color: #666;
+        }
+        .week-marker { position: relative; text-align: center; }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            font-size: 12px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-color { width: 20px; height: 14px; border: 1px solid #000; }
+        .legend-color.blue { background: #3498db; }
+        .legend-color.yellow { background: #f1c40f; }
+        .legend-color.green { background: #27ae60; }
+
+        /* Commentary */
+        .commentary-container {
+            background: #333;
+            color: #fff;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            min-height: 50px;
+            border: 2px solid #000;
+        }
+        .commentary-container.hidden { display: none; }
+        .commentary-text {
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        /* Comparison Panel */
+        .comparison-panel {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .comparison-panel.hidden { display: none; }
+        .comparison-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        .comparison-card {
+            border: 2px solid #ccc;
+            padding: 15px;
+            text-align: center;
+        }
+        .comparison-card.ideal { border-color: #9c27b0; }
+        .comparison-card.singletask { border-color: #4caf50; }
+        .comparison-card.multitask { border-color: #f44336; }
+        .comparison-card.has-data { background: #f9f9f9; }
+        .comparison-card .card-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .comparison-card .card-stat {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .comparison-card .card-label {
+            font-size: 11px;
+            color: #666;
+        }
+        .comparison-card .card-detail {
+            font-size: 12px;
+            margin-top: 10px;
+            color: #333;
+        }
+        .comparison-card.no-data {
+            opacity: 0.5;
+        }
+        .comparison-card.no-data .card-stat {
+            color: #999;
+        }
+        .comparison-insight {
+            margin-top: 15px;
+            padding: 15px;
+            background: #fff8e8;
+            border: 2px solid #d4a017;
+            font-size: 14px;
+        }
+        .comparison-insight.hidden { display: none; }
+
+        .results {
+            background: #fff8e8;
+            border: 2px solid #d4a017;
+            padding: 20px;
+            display: none;
+            margin-top: 20px;
+        }
+        .results.visible { display: block; }
+        .results-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
+        .results-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .results-row:last-of-type { border-bottom: none; }
+        .results-highlight {
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 15px;
+            padding: 15px;
+            border: 2px solid;
+        }
+        .results-highlight.bad { background: #ffebee; border-color: #c0392b; color: #c0392b; }
+        .results-highlight.good { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }
+        .results-insight {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            font-size: 13px;
+        }
+
+        .help-btn {
+            font-size: 14px;
+            padding: 5px 10px;
+            cursor: pointer;
+            border: 2px solid #ccc;
+            background: #fff;
+            font-family: monospace;
+        }
+        .help-btn:hover { border-color: #666; }
+    </style>
+</head>
+<body>
+    <!-- Onboarding Modal -->
+    <div class="onboarding-overlay" id="onboarding">
+        <div class="onboarding-modal">
+            <div class="onboarding-title">Welcome to the Multitasking Simulator</div>
+
+            <div class="onboarding-section">
+                <h3>The Setup</h3>
+                <p>You have <strong>3 projects</strong> to complete. Each project has <strong>10 tasks</strong> that must be done in sequence (Task 1, then Task 2, etc.). Each task takes <strong>2 weeks</strong>.</p>
+                <ul>
+                    <li><strong>P1 (High Value)</strong> - Earns $10,000/week once complete</li>
+                    <li><strong>P2 (Medium Value)</strong> - Earns $8,000/week once complete</li>
+                    <li><strong>P3 (Lower Value)</strong> - Earns $5,000/week once complete</li>
+                </ul>
+            </div>
+
+            <div class="onboarding-section">
+                <h3>The Resources</h3>
+                <p>You have specialist workers who can only do certain tasks:</p>
+                <ul>
+                    <li><span style="color: #3498db; font-weight: bold;">Blue</span> - Does Tasks 1-3</li>
+                    <li><span style="color: #b8860b; font-weight: bold;">Yellow</span> - Does Tasks 4-7</li>
+                    <li><span style="color: #27ae60; font-weight: bold;">Green</span> - Does Tasks 8-10</li>
+                </ul>
+            </div>
+
+            <div class="onboarding-section">
+                <h3>The Three Scenarios</h3>
+
+                <div class="scenario-box ideal">
+                    <strong>Ideal (9 resources)</strong>
+                    Each project gets its own dedicated Blue, Yellow, and Green. All 3 projects finish at week 20 simultaneously. <em>This is the dream, but requires 3x the staff!</em>
+                </div>
+
+                <div class="scenario-box singletask">
+                    <strong>Single-tasking (3 resources, focused)</strong>
+                    One Blue, one Yellow, one Green - but they FOCUS on finishing P1 completely before starting P2, then P3. Projects finish at weeks 20, 28, 36.
+                </div>
+
+                <div class="scenario-box multitask">
+                    <strong>Multitasking (3 resources, diluted)</strong>
+                    Same 3 resources, but they switch between all projects constantly. Everyone waits, everything is delayed. Projects finish around weeks 48, 50, 52.
+                </div>
+            </div>
+
+            <div class="onboarding-section">
+                <h3>What to Watch For</h3>
+                <p>Run each scenario and compare:</p>
+                <ul>
+                    <li>When does each project finish?</li>
+                    <li>How much money is earned by week 60?</li>
+                </ul>
+                <p style="margin-top: 10px;">As you'll see, <strong>multitasking costs a fortune</strong> - yet it's how most businesses operate. Run the simulations to see why.</p>
+            </div>
+
+            <button class="onboarding-start" id="startOnboarding">Got it - Let's Begin!</button>
+        </div>
+    </div>
+
+    <h1>MULTITASKING SIMULATOR</h1>
+    <div class="subtitle">Based on Clarke Ching's "Cash Cows Best Burgers" - See how diluting attention delays everything</div>
+
+    <div class="controls">
+        <div class="mode-selector">
+            <button class="mode-btn" data-mode="ideal">Ideal</button>
+            <button class="mode-btn active" data-mode="singletask">Single-tasking</button>
+            <button class="mode-btn" data-mode="multitask">Multitasking</button>
+        </div>
+        <div class="speed-control">
+            <label>Speed:</label>
+            <select id="speedSelect">
+                <option value="400" selected>Slow</option>
+                <option value="150">Normal</option>
+                <option value="50">Fast</option>
+            </select>
+        </div>
+        <button class="mute-btn muted" id="muteBtn" title="Toggle sound">🔇</button>
+        <button class="toggle-btn" id="moneyEffectsBtn" title="Toggle money effects">$ Effects</button>
+        <button class="help-btn" id="helpBtn">? Help</button>
+    </div>
+
+    <div class="control-row">
+        <button id="startBtn">&#9654; AUTO-RUN</button>
+        <div class="step-controls">
+            <button class="step-btn" id="stepBackBtn" title="Rewind one week">&#9664;&#9664; Rewind</button>
+            <button class="step-btn" id="stepForwardBtn" title="Step forward one week">Step &#9654;&#9654;</button>
+        </div>
+        <span id="manualModeLabel" style="font-size: 12px; color: #666;"></span>
+    </div>
+
+    <script>
+        document.getElementById('muteBtn').onclick = function() {
+            var btn = this;
+            if (btn.classList.contains('muted')) {
+                btn.textContent = '🔊';
+                btn.classList.remove('muted');
+                window.isMuted = false;
+                if (!window.audioCtx) {
+                    window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (window.audioCtx.state === 'suspended') {
+                    window.audioCtx.resume();
+                }
+            } else {
+                btn.textContent = '🔇';
+                btn.classList.add('muted');
+                window.isMuted = true;
+            }
+        };
+    </script>
+
+    <div class="mode-explanation" id="modeExplanation">
+        <strong>Single-tasking Mode:</strong> Reality: we must share resources. But we choose to FOCUS - finish one project before starting the next. Projects queue up, but each one flows fast once started.
+    </div>
+
+    <div class="stats">
+        <div class="stat" id="weekStat">
+            <div class="stat-label">Current Week</div>
+            <div class="stat-value" id="weekDisplay">0</div>
+        </div>
+        <div class="stat" id="moneyStat">
+            <div class="stat-label">Money Earned (cumulative)</div>
+            <div class="stat-value money" id="moneyDisplay">$0</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Projects Completed</div>
+            <div class="stat-value" id="completedDisplay">0 / 3</div>
+        </div>
+    </div>
+
+    <div class="timelines-container">
+        <div class="timelines-title" id="timelinesTitle">Project Timelines (52 weeks)</div>
+
+        <div class="project-row" id="projectRow1">
+            <div class="project-label">
+                P1 - High Value
+                <div class="value">$10K/week</div>
+                <div class="status waiting" id="status1">Waiting</div>
+            </div>
+            <div class="timeline" id="timeline1"></div>
+        </div>
+
+        <div class="project-row" id="projectRow2">
+            <div class="project-label">
+                P2 - Medium Value
+                <div class="value">$8K/week</div>
+                <div class="status waiting" id="status2">Waiting</div>
+            </div>
+            <div class="timeline" id="timeline2"></div>
+        </div>
+
+        <div class="project-row" id="projectRow3">
+            <div class="project-label">
+                P3 - Lower Value
+                <div class="value">$5K/week</div>
+                <div class="status waiting" id="status3">Waiting</div>
+            </div>
+            <div class="timeline" id="timeline3"></div>
+        </div>
+
+        <div class="week-markers" id="weekMarkers"></div>
+
+        <div class="legend">
+            <div class="legend-item"><div class="legend-color blue"></div> Blue (Tasks 1-3)</div>
+            <div class="legend-item"><div class="legend-color yellow"></div> Yellow (Tasks 4-7)</div>
+            <div class="legend-item"><div class="legend-color green"></div> Green (Tasks 8-10)</div>
+        </div>
+    </div>
+
+    <div class="commentary-container" id="commentary">
+        <p class="commentary-text" id="commentaryText">Select a scenario and press START to begin the simulation.</p>
+    </div>
+
+    <!-- Comparison Panel -->
+    <div class="comparison-panel" id="comparisonPanel">
+        <div class="comparison-title">Scenario Comparison</div>
+        <div class="comparison-grid">
+            <div class="comparison-card ideal no-data" id="compareIdeal">
+                <div class="card-title">Ideal</div>
+                <div class="card-stat" id="idealMoney">-</div>
+                <div class="card-label">Total Earnings</div>
+                <div class="card-detail" id="idealDetail">Run this scenario</div>
+            </div>
+            <div class="comparison-card singletask no-data" id="compareSingletask">
+                <div class="card-title">Single-tasking</div>
+                <div class="card-stat" id="singletaskMoney">-</div>
+                <div class="card-label">Total Earnings</div>
+                <div class="card-detail" id="singletaskDetail">Run this scenario</div>
+            </div>
+            <div class="comparison-card multitask no-data" id="compareMultitask">
+                <div class="card-title">Multitasking</div>
+                <div class="card-stat" id="multitaskMoney">-</div>
+                <div class="card-label">Total Earnings</div>
+                <div class="card-detail" id="multitaskDetail">Run this scenario</div>
+            </div>
+        </div>
+        <div class="comparison-insight hidden" id="comparisonInsight"></div>
+    </div>
+
+    <div class="results" id="results">
+        <div class="results-title">Simulation Complete!</div>
+        <div id="resultsContent"></div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            TASKS_PER_PROJECT: 10,
+            WEEKS_PER_TASK: 2,
+            PROJECT_VALUES: [10000, 8000, 5000],
+            PROJECT_NAMES: ['P1', 'P2', 'P3'],
+            TOTAL_WEEKS: 52,
+            RESOURCE_TASKS: {
+                blue: [0, 1, 2],
+                yellow: [3, 4, 5, 6],
+                green: [7, 8, 9]
+            },
+            RESOURCE_NAMES: {
+                blue: 'Blue',
+                yellow: 'Yellow',
+                green: 'Green'
+            }
+        };
+
+        const MODE_EXPLANATIONS = {
+            ideal: '<strong>Ideal Mode:</strong> What if we had unlimited resources? Each project gets dedicated staff (3 Blues, 3 Yellows, 3 Greens) and finishes as fast as possible. All projects complete simultaneously.',
+            singletask: '<strong>Single-tasking Mode:</strong> Reality: we must share resources (1 Blue, 1 Yellow, 1 Green). But we choose to FOCUS - finish one project before starting the next. Projects queue up, but each one flows fast once started.',
+            multitask: '<strong>Multitasking Mode:</strong> Same resources as Single-tasking, but we try to keep everyone happy by working on all projects at once. Each project only gets a sliver of attention, so everything takes forever.'
+        };
+
+        // Audio
+        window.audioCtx = null;
+        window.isMuted = true;
+        let moneyEffectsEnabled = false;
+
+        function playWorkSound() {
+            if (window.isMuted) return;
+            if (!window.audioCtx) {
+                window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            var audioCtx = window.audioCtx;
+
+            const thump = audioCtx.createOscillator();
+            const thumpGain = audioCtx.createGain();
+            thump.connect(thumpGain);
+            thumpGain.connect(audioCtx.destination);
+            thump.type = 'sine';
+            thump.frequency.setValueAtTime(150 + Math.random() * 30, audioCtx.currentTime);
+            thump.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.08);
+            thumpGain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            thumpGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            thump.start();
+            thump.stop(audioCtx.currentTime + 0.1);
+
+            const click = audioCtx.createOscillator();
+            const clickGain = audioCtx.createGain();
+            click.connect(clickGain);
+            clickGain.connect(audioCtx.destination);
+            click.type = 'square';
+            click.frequency.setValueAtTime(800 + Math.random() * 200, audioCtx.currentTime);
+            click.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.02);
+            clickGain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+            clickGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+            click.start();
+            click.stop(audioCtx.currentTime + 0.03);
+        }
+
+        function playCashRegisterSound() {
+            if (window.isMuted) return;
+            if (!window.audioCtx) {
+                window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            var audioCtx = window.audioCtx;
+
+            // Cha-ching! Cash register sound
+            // Bell/ding part
+            const bell = audioCtx.createOscillator();
+            const bellGain = audioCtx.createGain();
+            bell.connect(bellGain);
+            bellGain.connect(audioCtx.destination);
+            bell.type = 'sine';
+            bell.frequency.setValueAtTime(1200, audioCtx.currentTime);
+            bell.frequency.setValueAtTime(1500, audioCtx.currentTime + 0.05);
+            bell.frequency.setValueAtTime(1800, audioCtx.currentTime + 0.1);
+            bellGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            bellGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            bell.start();
+            bell.stop(audioCtx.currentTime + 0.4);
+
+            // Mechanical clunk
+            const clunk = audioCtx.createOscillator();
+            const clunkGain = audioCtx.createGain();
+            clunk.connect(clunkGain);
+            clunkGain.connect(audioCtx.destination);
+            clunk.type = 'square';
+            clunk.frequency.setValueAtTime(100, audioCtx.currentTime + 0.15);
+            clunk.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.25);
+            clunkGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            clunkGain.gain.setValueAtTime(0.2, audioCtx.currentTime + 0.15);
+            clunkGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            clunk.start();
+            clunk.stop(audioCtx.currentTime + 0.3);
+
+            // Coin jingle
+            for (let i = 0; i < 3; i++) {
+                const coin = audioCtx.createOscillator();
+                const coinGain = audioCtx.createGain();
+                coin.connect(coinGain);
+                coinGain.connect(audioCtx.destination);
+                coin.type = 'sine';
+                coin.frequency.setValueAtTime(2000 + i * 300, audioCtx.currentTime + 0.2 + i * 0.05);
+                coinGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                coinGain.gain.setValueAtTime(0.1, audioCtx.currentTime + 0.2 + i * 0.05);
+                coinGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35 + i * 0.05);
+                coin.start();
+                coin.stop(audioCtx.currentTime + 0.4 + i * 0.05);
+            }
+        }
+
+        function playCompletionSound() {
+            if (window.isMuted) return;
+            playCashRegisterSound();
+        }
+
+        // State
+        let mode = 'singletask';
+        let running = false;
+        let manualMode = false;
+        let currentWeek = 0;
+        let moneyEarned = 0;
+        let projects = [];
+        let schedule = [];
+        let simulationInterval = null;
+        let tickSpeed = 400;
+        let scenarioResults = {}; // Store results for comparison
+
+        // Commentary state
+        let lastCommentary = '';
+
+        function getResourceType(taskIndex) {
+            if (CONFIG.RESOURCE_TASKS.blue.includes(taskIndex)) return 'blue';
+            if (CONFIG.RESOURCE_TASKS.yellow.includes(taskIndex)) return 'yellow';
+            return 'green';
+        }
+
+        function initProjects() {
+            projects = [];
+            for (let p = 0; p < 3; p++) {
+                const tasks = [];
+                for (let t = 0; t < CONFIG.TASKS_PER_PROJECT; t++) {
+                    tasks.push({
+                        id: t,
+                        resource: getResourceType(t),
+                        status: 'pending',
+                        startWeek: null,
+                        endWeek: null
+                    });
+                }
+                projects.push({
+                    id: p,
+                    tasks: tasks,
+                    complete: false,
+                    completedWeek: null
+                });
+            }
+            moneyEarned = 0;
+            currentWeek = 0;
+        }
+
+        function computeSchedule() {
+            schedule = [];
+
+            if (mode === 'ideal') {
+                for (let p = 0; p < 3; p++) {
+                    let weekOffset = 0;
+                    for (let t = 0; t < CONFIG.TASKS_PER_PROJECT; t++) {
+                        const startWeek = weekOffset;
+                        const endWeek = startWeek + CONFIG.WEEKS_PER_TASK;
+                        schedule.push({ project: p, task: t, startWeek, endWeek });
+                        weekOffset = endWeek;
+                    }
+                }
+            } else if (mode === 'singletask') {
+                let projectOffset = 0;
+                for (let p = 0; p < 3; p++) {
+                    let resourceFree = { blue: projectOffset, yellow: projectOffset, green: projectOffset };
+                    for (let t = 0; t < CONFIG.TASKS_PER_PROJECT; t++) {
+                        const resource = getResourceType(t);
+                        const prevTaskEnd = t > 0 ? schedule.find(s => s.project === p && s.task === t - 1).endWeek : projectOffset;
+                        const startWeek = Math.max(prevTaskEnd, resourceFree[resource]);
+                        const endWeek = startWeek + CONFIG.WEEKS_PER_TASK;
+                        schedule.push({ project: p, task: t, startWeek, endWeek });
+                        resourceFree[resource] = endWeek;
+                    }
+                    const lastTask = schedule.filter(s => s.project === p).pop();
+                    projectOffset = lastTask.endWeek;
+                }
+            } else if (mode === 'multitask') {
+                let resourceFree = { blue: 0, yellow: 0, green: 0 };
+                let projectTaskIndex = [0, 0, 0];
+                let projectPrevEnd = [0, 0, 0];
+
+                while (projectTaskIndex.some((idx) => idx < CONFIG.TASKS_PER_PROJECT)) {
+                    for (let p = 0; p < 3; p++) {
+                        const t = projectTaskIndex[p];
+                        if (t >= CONFIG.TASKS_PER_PROJECT) continue;
+                        const resource = getResourceType(t);
+                        const prevTaskEnd = projectPrevEnd[p];
+                        const startWeek = Math.max(prevTaskEnd, resourceFree[resource]);
+                        const endWeek = startWeek + CONFIG.WEEKS_PER_TASK;
+                        schedule.push({ project: p, task: t, startWeek, endWeek });
+                        resourceFree[resource] = endWeek;
+                        projectPrevEnd[p] = endWeek;
+                        projectTaskIndex[p]++;
+                    }
+                }
+            }
+        }
+
+        function getMaxWeek() {
+            if (schedule.length === 0) return CONFIG.TOTAL_WEEKS;
+            const maxFromSchedule = Math.max(...schedule.map(s => s.endWeek));
+            return Math.max(maxFromSchedule, CONFIG.TOTAL_WEEKS);
+        }
+
+        function renderWeekMarkers() {
+            const container = document.getElementById('weekMarkers');
+            const timeline = document.getElementById('timeline1');
+            const width = timeline.offsetWidth;
+            const maxWeek = getMaxWeek();
+
+            document.getElementById('timelinesTitle').textContent = `Project Timelines (${maxWeek} weeks)`;
+
+            let html = '';
+            const step = maxWeek <= 52 ? 4 : 8;
+            for (let w = 0; w <= maxWeek; w += step) {
+                const left = (w / maxWeek) * width;
+                html += `<div class="week-marker" style="position: absolute; left: ${left}px;">${w}</div>`;
+            }
+            container.innerHTML = `<div style="position: relative; width: ${width}px; height: 15px;">${html}</div>`;
+        }
+
+        function renderTimelines() {
+            const maxWeek = getMaxWeek();
+
+            for (let p = 0; p < 3; p++) {
+                const timeline = document.getElementById('timeline' + (p + 1));
+
+                let html = '<div class="timeline-grid">';
+                for (let w = 0; w <= maxWeek; w += 2) {
+                    const left = (w / maxWeek) * 100;
+                    const isMajor = w % 10 === 0;
+                    html += `<div class="grid-line${isMajor ? ' major' : ''}" style="left: ${left}%;"></div>`;
+                }
+                html += '</div>';
+
+                const projectSchedule = schedule.filter(s => s.project === p);
+
+                for (const item of projectSchedule) {
+                    const task = projects[p].tasks[item.task];
+                    const left = (item.startWeek / maxWeek) * 100;
+                    const taskWidth = (CONFIG.WEEKS_PER_TASK / maxWeek) * 100;
+                    html += `
+                        <div class="task-block ${task.resource} ${task.status}"
+                             style="left: ${left}%; width: ${taskWidth}%;"
+                             data-task="${item.task}">
+                            ${item.task + 1}
+                        </div>
+                    `;
+                }
+
+                timeline.innerHTML = html;
+
+                const statusEl = document.getElementById('status' + (p + 1));
+                if (projects[p].complete) {
+                    statusEl.textContent = 'Done W' + projects[p].completedWeek;
+                    statusEl.className = 'status complete';
+                } else if (projects[p].tasks.some(t => t.status === 'active')) {
+                    statusEl.textContent = 'In Progress';
+                    statusEl.className = 'status in-progress';
+                } else {
+                    statusEl.textContent = 'Waiting';
+                    statusEl.className = 'status waiting';
+                }
+            }
+        }
+
+        // Generate commentary based on current state
+        function generateCommentary() {
+            if (currentWeek === 0) {
+                return 'Simulation ready. Press START or use step controls.';
+            }
+
+            const activeTasks = [];
+            const justStarted = [];
+            const justCompleted = [];
+
+            for (const item of schedule) {
+                const task = projects[item.project].tasks[item.task];
+                if (item.startWeek === currentWeek) {
+                    justStarted.push(item);
+                }
+                if (item.endWeek === currentWeek) {
+                    justCompleted.push(item);
+                }
+                if (currentWeek >= item.startWeek && currentWeek < item.endWeek) {
+                    activeTasks.push(item);
+                }
+            }
+
+            const projectsJustCompleted = projects.filter(p => p.completedWeek === currentWeek);
+
+            let commentary = `Week ${currentWeek}: `;
+            const parts = [];
+
+            // Project completions are most important
+            for (const proj of projectsJustCompleted) {
+                parts.push(`${CONFIG.PROJECT_NAMES[proj.id]} COMPLETE! Now earning $${(CONFIG.PROJECT_VALUES[proj.id]/1000).toFixed(0)}K/week.`);
+            }
+
+            // Task starts
+            if (justStarted.length > 0) {
+                const taskDescs = justStarted.map(item => {
+                    const resource = CONFIG.RESOURCE_NAMES[getResourceType(item.task)];
+                    return `${resource} starts Task ${item.task + 1} on ${CONFIG.PROJECT_NAMES[item.project]}`;
+                });
+                parts.push(taskDescs.join('. ') + '.');
+            }
+
+            // Task completions (if no project completed)
+            if (justCompleted.length > 0 && projectsJustCompleted.length === 0) {
+                const taskDescs = justCompleted.map(item => {
+                    return `Task ${item.task + 1} done on ${CONFIG.PROJECT_NAMES[item.project]}`;
+                });
+                parts.push(taskDescs.join(', ') + '.');
+            }
+
+            // What's currently active
+            if (activeTasks.length > 0 && parts.length === 0) {
+                const activeDescs = activeTasks.map(item => {
+                    const resource = CONFIG.RESOURCE_NAMES[getResourceType(item.task)];
+                    return `${resource} working on ${CONFIG.PROJECT_NAMES[item.project]}`;
+                });
+                parts.push(activeDescs.join(', ') + '.');
+            }
+
+            // Mode-specific insights
+            if (mode === 'multitask' && currentWeek > 6) {
+                const p1Progress = projects[0].tasks.filter(t => t.status === 'complete').length;
+                const p2Progress = projects[1].tasks.filter(t => t.status === 'complete').length;
+                const p3Progress = projects[2].tasks.filter(t => t.status === 'complete').length;
+                if (p1Progress < 5 && p2Progress < 5 && p3Progress < 5 && currentWeek > 20) {
+                    parts.push('Notice how all projects are progressing slowly due to constant switching!');
+                }
+            }
+
+            if (mode === 'singletask') {
+                const p1Done = projects[0].complete;
+                const p2Done = projects[1].complete;
+                if (p1Done && !p2Done && projects[1].tasks.some(t => t.status === 'active')) {
+                    if (!lastCommentary.includes('P2 gets full attention')) {
+                        parts.push('P2 now gets full attention from all resources!');
+                    }
+                }
+            }
+
+            return commentary + (parts.length > 0 ? parts.join(' ') : 'Work continues...');
+        }
+
+        function updateCommentary() {
+            const text = generateCommentary();
+            if (text !== lastCommentary) {
+                document.getElementById('commentaryText').textContent = text;
+                lastCommentary = text;
+            }
+        }
+
+        function tick(playSound = true) {
+            currentWeek++;
+            let projectJustCompleted = null;
+            let moneyThisTick = 0;
+
+            // Add money from completed projects
+            for (let p = 0; p < 3; p++) {
+                if (projects[p].complete) {
+                    moneyThisTick += CONFIG.PROJECT_VALUES[p];
+                }
+            }
+            moneyEarned += moneyThisTick;
+
+            // Update task statuses
+            for (const item of schedule) {
+                const task = projects[item.project].tasks[item.task];
+                if (currentWeek >= item.startWeek && currentWeek < item.endWeek) {
+                    if (task.status !== 'active') {
+                        task.status = 'active';
+                        task.startWeek = item.startWeek;
+                    }
+                } else if (currentWeek >= item.endWeek) {
+                    if (task.status !== 'complete') {
+                        task.status = 'complete';
+                        task.endWeek = item.endWeek;
+                        if (playSound) playWorkSound();
+                    }
+                }
+            }
+
+            // Check for project completions
+            for (let p = 0; p < 3; p++) {
+                if (!projects[p].complete && projects[p].tasks.every(t => t.status === 'complete')) {
+                    projects[p].complete = true;
+                    projects[p].completedWeek = currentWeek;
+                    projectJustCompleted = p;
+                    if (playSound) playCompletionSound();
+
+                    // Visual feedback
+                    const row = document.getElementById('projectRow' + (p + 1));
+                    row.classList.add('just-completed');
+                    setTimeout(() => row.classList.remove('just-completed'), 1000);
+                }
+            }
+
+            // Money effects
+            if (moneyEffectsEnabled && moneyThisTick > 0) {
+                const moneyStat = document.getElementById('moneyStat');
+                moneyStat.classList.remove('earning');
+                void moneyStat.offsetWidth; // Trigger reflow
+                moneyStat.classList.add('earning');
+            }
+
+            render();
+            updateCommentary();
+
+            // Check if done
+            const maxWeek = getMaxWeek();
+            if (projects.every(p => p.complete) || currentWeek >= maxWeek) {
+                endSimulation();
+            }
+        }
+
+        function stepBack() {
+            if (currentWeek <= 0) return;
+
+            // Reset to beginning and replay to currentWeek - 1
+            const targetWeek = currentWeek - 1;
+            initProjects();
+            computeSchedule();
+
+            for (let w = 0; w < targetWeek; w++) {
+                tick(false);
+            }
+
+            // Fix the week counter (tick increments it)
+            if (targetWeek === 0) {
+                currentWeek = 0;
+                moneyEarned = 0;
+                initProjects();
+            }
+
+            render();
+            updateCommentary();
+            updateStepButtons();
+        }
+
+        function stepForward() {
+            const maxWeek = getMaxWeek();
+            if (currentWeek >= maxWeek) return;
+
+            tick(true);
+            updateStepButtons();
+        }
+
+        function updateStepButtons() {
+            const maxWeek = getMaxWeek();
+            // Rewind is always available if we're past week 0
+            document.getElementById('stepBackBtn').disabled = currentWeek <= 0;
+            // Step forward available if not at end
+            document.getElementById('stepForwardBtn').disabled = currentWeek >= maxWeek;
+        }
+
+        function render() {
+            document.getElementById('weekDisplay').textContent = currentWeek;
+            document.getElementById('moneyDisplay').textContent = '$' + moneyEarned.toLocaleString();
+            document.getElementById('completedDisplay').textContent =
+                projects.filter(p => p.complete).length + ' / 3';
+            renderTimelines();
+        }
+
+        function endSimulation() {
+            running = false;
+            manualMode = true; // Stay in manual mode so user can rewind
+            clearInterval(simulationInterval);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').innerHTML = '&#9654; AUTO-RUN AGAIN';
+            document.getElementById('manualModeLabel').textContent = '(Use Rewind to go back)';
+            updateStepButtons();
+
+            // Store results for comparison
+            const comparisonEndpoint = 60;
+            const actualWeeks = projects.map(p => p.completedWeek || getMaxWeek());
+            let totalEarned = 0;
+            for (let p = 0; p < 3; p++) {
+                const weeksEarning = comparisonEndpoint - actualWeeks[p];
+                totalEarned += Math.max(0, weeksEarning) * CONFIG.PROJECT_VALUES[p];
+            }
+
+            scenarioResults[mode] = {
+                weeks: actualWeeks,
+                totalEarned: totalEarned,
+                moneyEarned: moneyEarned
+            };
+
+            updateComparisonPanel();
+            showResults();
+        }
+
+        function updateComparisonPanel() {
+            const modes = ['ideal', 'singletask', 'multitask'];
+            const modeLabels = { ideal: 'Ideal', singletask: 'Single-task', multitask: 'Multitask' };
+
+            for (const m of modes) {
+                const card = document.getElementById('compare' + m.charAt(0).toUpperCase() + m.slice(1));
+                const moneyEl = document.getElementById(m + 'Money');
+                const detailEl = document.getElementById(m + 'Detail');
+
+                if (scenarioResults[m]) {
+                    card.classList.remove('no-data');
+                    card.classList.add('has-data');
+                    moneyEl.textContent = '$' + scenarioResults[m].totalEarned.toLocaleString();
+                    const weeks = scenarioResults[m].weeks;
+                    detailEl.textContent = `P1: W${weeks[0]}, P2: W${weeks[1]}, P3: W${weeks[2]}`;
+                } else {
+                    card.classList.add('no-data');
+                    card.classList.remove('has-data');
+                    moneyEl.textContent = '-';
+                    detailEl.textContent = 'Run this scenario';
+                }
+            }
+
+            // Show insight if we have at least 2 results
+            const resultCount = Object.keys(scenarioResults).length;
+            const insightEl = document.getElementById('comparisonInsight');
+
+            if (resultCount >= 2 && scenarioResults.singletask && scenarioResults.multitask) {
+                const diff = scenarioResults.singletask.totalEarned - scenarioResults.multitask.totalEarned;
+                insightEl.innerHTML = `<strong>Key Finding:</strong> Single-tasking earned <strong>$${diff.toLocaleString()}</strong> more than Multitasking! That's the cost of splitting attention across projects.`;
+                insightEl.classList.remove('hidden');
+            } else if (resultCount >= 1) {
+                const remaining = modes.filter(m => !scenarioResults[m]);
+                insightEl.innerHTML = `Run ${remaining.map(m => modeLabels[m]).join(' and ')} to compare results!`;
+                insightEl.classList.remove('hidden');
+            } else {
+                insightEl.classList.add('hidden');
+            }
+        }
+
+        function showResults() {
+            const resultsDiv = document.getElementById('results');
+            const resultsContent = document.getElementById('resultsContent');
+
+            const singletaskWeeks = [20, 28, 36];
+            const actualWeeks = projects.map(p => p.completedWeek || getMaxWeek());
+
+            const comparisonEndpoint = 60;
+            let totalEarned = 0;
+            for (let p = 0; p < 3; p++) {
+                const weeksEarning = comparisonEndpoint - actualWeeks[p];
+                totalEarned += Math.max(0, weeksEarning) * CONFIG.PROJECT_VALUES[p];
+            }
+
+            let singletaskTotal = 0;
+            for (let p = 0; p < 3; p++) {
+                const weeksEarning = comparisonEndpoint - singletaskWeeks[p];
+                singletaskTotal += Math.max(0, weeksEarning) * CONFIG.PROJECT_VALUES[p];
+            }
+
+            let html = `
+                <div class="results-row">
+                    <span>P1 completed:</span>
+                    <span>Week ${actualWeeks[0]}</span>
+                </div>
+                <div class="results-row">
+                    <span>P2 completed:</span>
+                    <span>Week ${actualWeeks[1]}</span>
+                </div>
+                <div class="results-row">
+                    <span>P3 completed:</span>
+                    <span>Week ${actualWeeks[2]}</span>
+                </div>
+                <div class="results-row">
+                    <span><strong>Total earnings (by week 60):</strong></span>
+                    <span><strong>$${totalEarned.toLocaleString()}</strong></span>
+                </div>
+            `;
+
+            if (mode === 'multitask') {
+                const costOfMultitasking = singletaskTotal - totalEarned;
+                html += `
+                    <div class="results-highlight bad">
+                        Cost of Multitasking: $${costOfMultitasking.toLocaleString()} in delayed revenue!
+                    </div>
+                    <div class="results-insight">
+                        <strong>Notice the gaps!</strong> Those gaps between tasks show time when this project's resource was working on OTHER projects.
+                        The same total work takes 3x longer in elapsed time because attention is split three ways.<br><br>
+                        <strong>Try Single-tasking mode</strong> - even P3 (the last project) finishes at week 36, which is earlier than P1 finished here!
+                    </div>
+                `;
+            } else if (mode === 'singletask') {
+                html += `
+                    <div class="results-highlight good">
+                        Baseline: This is the realistic best case with shared resources.
+                    </div>
+                    <div class="results-insight">
+                        <strong>Key insight:</strong> P1 finishes at week 20 - just as fast as if it had dedicated resources!
+                        P2 and P3 wait their turn, but once they start, they flow quickly.<br><br>
+                        <strong>Try Multitasking mode</strong> to see what happens when we try to work on everything at once.
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="results-highlight good">
+                        Ideal: All projects finish simultaneously with unlimited resources.
+                    </div>
+                    <div class="results-insight">
+                        <strong>This is the dream</strong> - but it requires 3x the staff (3 Blues, 3 Yellows, 3 Greens).<br><br>
+                        <strong>Try Single-tasking mode</strong> to see what we can achieve with just ONE of each resource.
+                    </div>
+                `;
+            }
+
+            resultsContent.innerHTML = html;
+            resultsDiv.classList.add('visible');
+        }
+
+        function start() {
+            if (running) return;
+
+            running = true;
+            manualMode = false;
+            initProjects();
+            computeSchedule();
+            document.getElementById('results').classList.remove('visible');
+
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('startBtn').textContent = 'RUNNING...';
+            document.getElementById('manualModeLabel').textContent = '';
+
+            renderWeekMarkers();
+            render();
+            updateCommentary();
+
+            simulationInterval = setInterval(tick, tickSpeed);
+        }
+
+        function enterManualMode() {
+            if (running) {
+                clearInterval(simulationInterval);
+                running = false;
+            }
+            manualMode = true;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').innerHTML = '&#9654; AUTO-RUN';
+            document.getElementById('manualModeLabel').textContent = '(Manual stepping mode)';
+            updateStepButtons();
+        }
+
+        // Mode toggle
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (running) return;
+
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                mode = btn.dataset.mode;
+
+                document.getElementById('modeExplanation').innerHTML = MODE_EXPLANATIONS[mode];
+
+                initProjects();
+                computeSchedule();
+                renderWeekMarkers();
+                render();
+                updateCommentary();
+                document.getElementById('results').classList.remove('visible');
+                updateStepButtons();
+            });
+        });
+
+        // Speed control
+        document.getElementById('speedSelect').addEventListener('change', (e) => {
+            tickSpeed = parseInt(e.target.value);
+            if (running) {
+                clearInterval(simulationInterval);
+                simulationInterval = setInterval(tick, tickSpeed);
+            }
+        });
+
+        // Start button
+        document.getElementById('startBtn').addEventListener('click', start);
+
+        // Step controls
+        document.getElementById('stepBackBtn').addEventListener('click', () => {
+            if (running) enterManualMode();
+            // Hide results when rewinding
+            document.getElementById('results').classList.remove('visible');
+            stepBack();
+        });
+
+        document.getElementById('stepForwardBtn').addEventListener('click', () => {
+            if (!running && !manualMode) {
+                // Fresh start - initialize
+                initProjects();
+                computeSchedule();
+                renderWeekMarkers();
+                enterManualMode();
+            } else if (running) {
+                enterManualMode();
+            }
+            // If we're in manual mode after completion, hide results when stepping
+            document.getElementById('results').classList.remove('visible');
+            stepForward();
+        });
+
+        // Money effects toggle
+        document.getElementById('moneyEffectsBtn').addEventListener('click', () => {
+            moneyEffectsEnabled = !moneyEffectsEnabled;
+            document.getElementById('moneyEffectsBtn').classList.toggle('active', moneyEffectsEnabled);
+        });
+
+        // Help button
+        document.getElementById('helpBtn').addEventListener('click', () => {
+            document.getElementById('onboarding').classList.remove('hidden');
+        });
+
+        // Onboarding
+        document.getElementById('startOnboarding').addEventListener('click', () => {
+            document.getElementById('onboarding').classList.add('hidden');
+            localStorage.setItem('multitaskingSimOnboarded', 'true');
+        });
+
+        // Check if first visit
+        if (!localStorage.getItem('multitaskingSimOnboarded')) {
+            document.getElementById('onboarding').classList.remove('hidden');
+        } else {
+            document.getElementById('onboarding').classList.add('hidden');
+        }
+
+        // Initialize
+        initProjects();
+        computeSchedule();
+        updateComparisonPanel();
+
+        setTimeout(() => {
+            renderWeekMarkers();
+            render();
+            updateCommentary();
+            updateStepButtons();
+        }, 100);
+    </script>
+</body>
+</html>
